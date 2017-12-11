@@ -123,3 +123,7 @@ typings/
 
 # dotenv environment variables file
 .env
+
+server/pkg
+server/vendor/pkg
+server/vendor/bin
