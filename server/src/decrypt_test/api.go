@@ -3,6 +3,7 @@ package decrypt_test
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/google/uuid"
 	"sync"
 	"crypto/rsa"
@@ -78,6 +79,17 @@ func doVerify(c *gin.Context) {
 func GetRoutes() *gin.Engine {
 	r := gin.New()
 
+	config := cors.DefaultConfig()
+	// config.AllowOrigins = []string{"http://localhost", "http://localhost:88" }
+
+	config.AllowOriginFunc = func(origin string) bool {
+		return true
+	}
+	// config.AllowOrigins == []string{"http://google.com", "http://facebook.com"}
+
+	r.Use(cors.New(config))
+
+
 	test := r.Group("/test")
 	{
 		test.GET("/start", startTest)
@@ -85,6 +97,7 @@ func GetRoutes() *gin.Engine {
 		test.GET("/data", getData)
 		test.GET("/verify", doVerify)
 	}
+
 
 	return r
 }
