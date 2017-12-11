@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "lib": [ "es2015.promise", "es5", "dom", "scripthost", "es2015.iterable" ],
+    "sourceMap": true,
+    "jsx": "react",
+    "experimentalDecorators": true,
+    "noImplicitAny": true,
+    "outDir": "test-build",
+    "noUnusedLocals": true,
+    "strictNullChecks": false,
+    "importHelpers": true,
+    "noEmitHelpers": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "typeRoots": [
+      "local_node_modules/@types",
+      "node_modules/@types"
+    ],
+    "types": [
+      "jasmine",
+      "react",
+      "react-dom",
+      "lodash",
+      "underscore",
+      "urijs"
+    ]
+  },
+  "exclude": [
+    "node_modules_local",
+    "node_modules"
+  ],
+  "baseUrl": "."
+}

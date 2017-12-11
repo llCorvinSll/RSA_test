@@ -19,7 +19,7 @@ type Test struct {
 }
 
 type Tests struct {
-	mut sync.Mutex
+	mut sync.RWMutex
 	m map[string]Test
 
 }
@@ -59,8 +59,8 @@ func startTest(c *gin.Context) {
 	}
 
 	c.JSON(200, gin.H{
-		"public_key": keyToString(key.PublicKey),
 		"test_id": newTestUid.String(),
+		"public_key": keyToString(key.PublicKey),
 	})
 }
 
@@ -69,7 +69,15 @@ func endTest(c *gin.Context) {
 }
 
 func getData(c *gin.Context) {
+	tests.mut.RLock()
+	defer tests.mut.RUnlock()
 
+	uuid := c.Param("uuid")
+
+	c.JSON(200, gin.H{
+		"test_id": uuid,
+		"string": randStringRunes(100),
+	})
 }
 
 func doVerify(c *gin.Context) {
@@ -94,7 +102,7 @@ func GetRoutes() *gin.Engine {
 	{
 		test.GET("/start", startTest)
 		test.GET("/end", endTest)
-		test.GET("/data", getData)
+		test.GET("/data/:uuid", getData)
 		test.GET("/verify", doVerify)
 	}
 
