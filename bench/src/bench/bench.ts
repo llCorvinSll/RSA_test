@@ -59,7 +59,7 @@ function singleRun() {
 }
 
 function encryptEndVerify(pub_key:string, uuid:string):Promise<{}> {
-    return Axios.get(HOST_URL + "/test/data/" + uuid).then((data) => {
+    return Axios.get(HOST_URL + "/test/data/" + uuid).then<string[]>((data) => {
         const encryptor = new JSEncrypt();
 
         encryptor.setPublicKey(pub_key);
@@ -69,7 +69,7 @@ function encryptEndVerify(pub_key:string, uuid:string):Promise<{}> {
             return Promise.reject("fail to encrypt message");
         }
 
-        return [encrypted, data.data.string];
+        return [encrypted, (data.data.string) as string];
     }).then(([encrypted, original]:[string, string]) => {
         return validate(encrypted, original, uuid);
     });
