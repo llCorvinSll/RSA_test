@@ -3,6 +3,8 @@ import {JSEncrypt} from "jsencrypt";
 
 const HOST_URL = "http://localhost:8080";
 
+const MAX_ATTEMPTS = 1000;
+
 export function runBench() {
     singleRun();
 }
@@ -13,27 +15,55 @@ function singleRun() {
     let count = 0;
 
     Axios.get(`${HOST_URL}/test/start`).then((data) => {
-        console.log(data.data);
-
-
         PUB_KEY = data.data.public_key;
         UUID = data.data.test_id;
 
-        return encriptEndWerify(PUB_KEY, UUID);
+        const do_work:() => Promise<{}> = () => {
+            return encryptEndVerify(PUB_KEY, UUID).then(() => {
+                count++;
+
+                if (count <= MAX_ATTEMPTS) {
+                    return do_work();
+                }
+
+                return;
+            });
+        };
+
+        do_work().then(() => {
+            console.log("GOOD");
+        }, () => {
+            console.log("ERROR");
+        });
 
     });
 }
 
-function encriptEndWerify(pub_key:string, uuid:string):Promise<{}> {
+function encryptEndVerify(pub_key:string, uuid:string):Promise<{}> {
     return Axios.get(HOST_URL + "/test/data/" + uuid).then((data) => {
-        console.log(data.data);
+        const encryptor = new JSEncrypt();
 
-        console.log("jsencrypt", JSEncrypt);
+        encryptor.setPublicKey(pub_key);
 
-        let encryptor = new JSEncrypt();
+        const encrypted = encryptor.encrypt(data.data.string);
+        if (!encrypted) {
+            return Promise.reject("fail to encrypt message");
+        }
 
-        console.log(encryptor)
+        return [encrypted, data.data.string];
+    }).then(([encrypted, original]:[string, string]) => {
+        return validate(encrypted, original, uuid);
+    });
+}
 
+
+function validate(encrypted:string, original:string, uuid:string):Promise<{}> {
+    return Axios.post(HOST_URL + "/test/verify/" + uuid, {
+        encrypted,
+        original
+
+    }).then(() => {
+        // asdsads;
         return {};
     });
 }

@@ -9,8 +9,9 @@ import (
 	"crypto/rsa"
 	"crypto/rand"
 	"encoding/pem"
-	"bytes"
-	"encoding/asn1"
+	"crypto/x509"
+	"fmt"
+	"encoding/base64"
 )
 
 type Test struct {
@@ -20,28 +21,30 @@ type Test struct {
 
 type Tests struct {
 	mut sync.RWMutex
-	m map[string]Test
+	m map[string]*Test
 
 }
 
 var tests = Tests {
-	m: make(map[string]Test),
+	m: make(map[string]*Test),
 }
 
 
-func keyToString(key interface{}) string {
-	asn1Bytes, _ := asn1.Marshal(key)
-
-	var pemkey = &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: asn1Bytes,
+func keyToString(key rsa.PublicKey) string {
+	pubDer, err := x509.MarshalPKIXPublicKey(&key)
+	if err != nil {
+		fmt.Println("Failed to get der format for PublicKey.", err)
+		return ""
 	}
 
-	buf := new(bytes.Buffer)
+	pubBlk := pem.Block {
+		Type:    "PUBLIC KEY",
+		Headers: nil,
+		Bytes:   pubDer,
+	}
+	pubPem := string(pem.EncodeToMemory(&pubBlk))
 
-	_ = pem.Encode(buf, pemkey)
-
-	return  buf.String()
+	return pubPem
 }
 
 func startTest(c *gin.Context) {
@@ -51,9 +54,13 @@ func startTest(c *gin.Context) {
 	newTestUid := uuid.New()
 
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
+	err := key.Validate()
+	if err != nil {
+		fmt.Println("Validation failed.", err)
+	}
 
 
-	tests.m[newTestUid.String()] = Test{
+	tests.m[newTestUid.String()] = &Test{
 		count: 0,
 		privateKey: key,
 	}
@@ -80,7 +87,45 @@ func getData(c *gin.Context) {
 	})
 }
 
+type VerifyData struct {
+	Encrypted string `json:"encrypted"`
+	Original string `json:"original"`
+}
+
 func doVerify(c *gin.Context) {
+	tests.mut.Lock()
+	defer tests.mut.Unlock()
+
+	uuid := c.Param("uuid")
+
+	var verifyData VerifyData
+	c.BindJSON(&verifyData)
+
+	curTest := tests.m[uuid]
+	fmt.Println(uuid)
+	fmt.Println(curTest.count)
+
+	decoded, _ := base64.StdEncoding.DecodeString(verifyData.Encrypted) // hex.DecodeString(verifyData.Encrypted)
+	decrypted, err := rsa.DecryptPKCS1v15(rand.Reader, curTest.privateKey, decoded)
+	if err != nil {
+		fmt.Println("cant decrypt", err)
+		c.Err()
+		return
+	}
+
+	if verifyData.Original == string(decrypted) {
+		c.Status(200)
+		curTest.count++
+		return
+	} else {
+
+	}
+
+
+
+
+
+
 
 }
 
@@ -88,12 +133,10 @@ func GetRoutes() *gin.Engine {
 	r := gin.New()
 
 	config := cors.DefaultConfig()
-	// config.AllowOrigins = []string{"http://localhost", "http://localhost:88" }
 
 	config.AllowOriginFunc = func(origin string) bool {
 		return true
 	}
-	// config.AllowOrigins == []string{"http://google.com", "http://facebook.com"}
 
 	r.Use(cors.New(config))
 
@@ -103,7 +146,7 @@ func GetRoutes() *gin.Engine {
 		test.GET("/start", startTest)
 		test.GET("/end", endTest)
 		test.GET("/data/:uuid", getData)
-		test.GET("/verify", doVerify)
+		test.POST("/verify/:uuid", doVerify)
 	}
 
 

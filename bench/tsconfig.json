@@ -17,14 +17,6 @@
     "typeRoots": [
       "local_node_modules/@types",
       "node_modules/@types"
-    ],
-    "types": [
-      "jasmine",
-      "react",
-      "react-dom",
-      "lodash",
-      "underscore",
-      "urijs"
     ]
   },
   "exclude": [
