@@ -1,6 +1,5 @@
 package decrypt_test
 
-
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
@@ -12,23 +11,23 @@ import (
 	"crypto/x509"
 	"fmt"
 	"encoding/base64"
+	"time"
 )
 
 type Test struct {
 	count      uint
+	beginTime  time.Time
 	privateKey *rsa.PrivateKey
 }
 
 type Tests struct {
 	mut sync.RWMutex
-	m map[string]*Test
-
+	m   map[string]*Test
 }
 
-var tests = Tests {
+var tests = Tests{
 	m: make(map[string]*Test),
 }
-
 
 func keyToString(key rsa.PublicKey) string {
 	pubDer, err := x509.MarshalPKIXPublicKey(&key)
@@ -37,7 +36,7 @@ func keyToString(key rsa.PublicKey) string {
 		return ""
 	}
 
-	pubBlk := pem.Block {
+	pubBlk := pem.Block{
 		Type:    "PUBLIC KEY",
 		Headers: nil,
 		Bytes:   pubDer,
@@ -59,37 +58,53 @@ func startTest(c *gin.Context) {
 		fmt.Println("Validation failed.", err)
 	}
 
-
 	tests.m[newTestUid.String()] = &Test{
-		count: 0,
+		count:      0,
 		privateKey: key,
 	}
 
 	c.JSON(200, gin.H{
-		"test_id": newTestUid.String(),
+		"test_id":    newTestUid.String(),
 		"public_key": keyToString(key.PublicKey),
 	})
 }
 
 func endTest(c *gin.Context) {
-
-}
-
-func getData(c *gin.Context) {
 	tests.mut.RLock()
 	defer tests.mut.RUnlock()
 
 	uuid := c.Param("uuid")
 
+	curTest := tests.m[uuid]
+
+	duration := time.Since(curTest.beginTime)
+
+	fmt.Printf("Test duration %v\n", duration)
+	fmt.Printf("1 cycle duration %vs\n", duration.Seconds()/float64(curTest.count))
+
+	c.Status(200)
+}
+
+func getData(c *gin.Context) {
+	tests.mut.Lock()
+	defer tests.mut.Unlock()
+
+	uuid := c.Param("uuid")
+
+	curTest := tests.m[uuid]
+	if curTest.beginTime.IsZero() {
+		curTest.beginTime = time.Now()
+	}
+
 	c.JSON(200, gin.H{
 		"test_id": uuid,
-		"string": randStringRunes(100),
+		"string":  randStringRunes(245),
 	})
 }
 
 type VerifyData struct {
 	Encrypted string `json:"encrypted"`
-	Original string `json:"original"`
+	Original  string `json:"original"`
 }
 
 func doVerify(c *gin.Context) {
@@ -102,8 +117,6 @@ func doVerify(c *gin.Context) {
 	c.BindJSON(&verifyData)
 
 	curTest := tests.m[uuid]
-	fmt.Println(uuid)
-	fmt.Println(curTest.count)
 
 	decoded, _ := base64.StdEncoding.DecodeString(verifyData.Encrypted) // hex.DecodeString(verifyData.Encrypted)
 	decrypted, err := rsa.DecryptPKCS1v15(rand.Reader, curTest.privateKey, decoded)
@@ -114,41 +127,32 @@ func doVerify(c *gin.Context) {
 	}
 
 	if verifyData.Original == string(decrypted) {
+		// c.Status(200)
 		c.Status(200)
 		curTest.count++
 		return
 	} else {
-
+		c.Status(500)
 	}
-
-
-
-
-
-
-
 }
 
 func GetRoutes() *gin.Engine {
 	r := gin.New()
 
 	config := cors.DefaultConfig()
-
 	config.AllowOriginFunc = func(origin string) bool {
 		return true
 	}
 
 	r.Use(cors.New(config))
 
-
 	test := r.Group("/test")
 	{
 		test.GET("/start", startTest)
-		test.GET("/end", endTest)
+		test.GET("/end/:uuid", endTest)
 		test.GET("/data/:uuid", getData)
 		test.POST("/verify/:uuid", doVerify)
 	}
-
 
 	return r
 }

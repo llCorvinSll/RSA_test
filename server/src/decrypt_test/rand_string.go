@@ -4,7 +4,6 @@ import (
 	"math/rand"
 )
 
-
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 
 func randStringRunes(n int) string {

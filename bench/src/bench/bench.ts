@@ -3,10 +3,33 @@ import {JSEncrypt} from "jsencrypt";
 
 const HOST_URL = "http://localhost:8080";
 
-const MAX_ATTEMPTS = 1000;
+const MAX_ATTEMPTS = 500;
+
+const MAX_KEYS = 100;
 
 export function runBench() {
-    singleRun();
+
+    let count = 0;
+
+    const do_work:() => Promise<{}> = () => {
+        return singleRun().then(() => {
+            count++;
+
+            if (count <= MAX_KEYS) {
+                return do_work();
+            }
+
+            return;
+        });
+    };
+
+    do_work().then(() => {
+        console.log("GOOD");
+        document.body.style.backgroundColor = "green";
+    }, () => {
+        console.log("ERROR");
+        document.body.style.backgroundColor = "red";
+    });
 }
 
 function singleRun() {
@@ -14,7 +37,7 @@ function singleRun() {
     let UUID = "";
     let count = 0;
 
-    Axios.get(`${HOST_URL}/test/start`).then((data) => {
+    return Axios.get(`${HOST_URL}/test/start`).then((data) => {
         PUB_KEY = data.data.public_key;
         UUID = data.data.test_id;
 
@@ -26,15 +49,11 @@ function singleRun() {
                     return do_work();
                 }
 
-                return;
+                return endTest(UUID);
             });
         };
 
-        do_work().then(() => {
-            console.log("GOOD");
-        }, () => {
-            console.log("ERROR");
-        });
+        return do_work();
 
     });
 }
@@ -56,13 +75,19 @@ function encryptEndVerify(pub_key:string, uuid:string):Promise<{}> {
     });
 }
 
-
 function validate(encrypted:string, original:string, uuid:string):Promise<{}> {
     return Axios.post(HOST_URL + "/test/verify/" + uuid, {
         encrypted,
         original
 
     }).then(() => {
+        // asdsads;
+        return {};
+    });
+}
+
+function endTest(uuid:string):Promise<{}> {
+    return Axios.get(HOST_URL + "/test/end/" + uuid).then(() => {
         // asdsads;
         return {};
     });
